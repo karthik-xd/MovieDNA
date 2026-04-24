@@ -1,4 +1,4 @@
-CineMatch: Content-Based Movie Recommender
+MOVIE_DNA: Content-Based Movie Recommender
 
 Aim
 The goal of this project is to build an intelligent recommendation engine that predicts a user's movie preferences by analyzing the "DNA" of films they already like. Unlike traditional systems that rely on what *other* people watch, this system focuses entirely on the **content** (plots, themes, and genres) of the movies themselves.
