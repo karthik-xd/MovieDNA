@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MovieDNA - Content-Based Movie Recommender & Taste Analyzer</title>
+  <meta name="description" content="Discover movies tailored to your exact taste using NLP TF-IDF vectorization and Cosine Similarity math on movie plots and genres.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="header-nav">
+    <a href="#" class="logo-container">
+      <div class="dna-icon-badge">
+        <i class="fa-solid fa-dna" style="color: var(--primary-cyan);"></i>
+      </div>
+      <div>
+        <div class="logo-text">MovieDNA</div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Content Recommendation Engine</div>
+      </div>
+    </a>
+    
+    <div class="nav-actions">
+      <div class="badge-tag live-api" id="api-status-badge">
+        <span class="dot"></span>
+        <span id="api-status-text">NLP Corpus Active</span>
+      </div>
+      <a href="https://github.com/karthik-xd/MovieDNA" target="_blank" class="btn-github">
+        <i class="fa-brands fa-github"></i>
+        <span>GitHub Repo</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-container">
+
+    <!-- Hero Header -->
+    <section class="hero-section">
+      <h1 class="hero-title">Decode Your Cinematic <span>Movie DNA</span></h1>
+      <p class="hero-subtitle">
+        An intelligent NLP recommendation system that analyzes movie plot overviews and genres using <strong>TF-IDF Vectorization</strong> and <strong>Cosine Similarity</strong> to calculate your mathematically ideal taste signature.
+      </p>
+
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-number" id="stat-movies-count">0</div>
+          <div class="stat-label">Movies Vectorized</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number" id="stat-vocab-count">0</div>
+          <div class="stat-label">NLP Dimensions</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">Cosine Sim</div>
+          <div class="stat-label">Matching Algorithm</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Taste Profile Builder Section -->
+    <section class="builder-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary-cyan);"></i>
+          Build Your Favorite Movies List
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Select at least 1 movie to extract your DNA profile</span>
+      </div>
+
+      <!-- Search Input -->
+      <div class="search-wrapper">
+        <div class="search-input-container">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input 
+            type="text" 
+            id="movie-search-input" 
+            class="search-input" 
+            placeholder="Search movie title (e.g. Avatar, Inception, The Batman, Dune...)"
+            autocomplete="off"
+          >
+        </div>
+        <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+      </div>
+
+      <!-- Quick Add Suggestions -->
+      <div class="quick-add-container">
+        <div class="quick-add-title">Quick Add Popular Titles:</div>
+        <div class="quick-chips" id="quick-chips-container"></div>
+      </div>
+
+      <!-- Selected Favorites Drawer -->
+      <div class="selected-drawer">
+        <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 14px; color: var(--text-muted);">
+          Your Selected Favorites (<span id="selected-count">0</span>):
+        </div>
+
+        <div id="selected-movies-grid" class="selected-movies-grid">
+          <!-- Dynamically populated selected cards -->
+        </div>
+
+        <div class="action-bar">
+          <button id="btn-clear-all" class="btn-secondary">
+            <i class="fa-solid fa-trash-can"></i> Clear All
+          </button>
+          
+          <button id="btn-analyze-dna" class="btn-primary">
+            <i class="fa-solid fa-dna"></i> Analyze DNA & Recommend
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics Dashboard (Hidden until analyzed) -->
+    <section id="analytics-section" class="analytics-section">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="fa-solid fa-chart-pie" style="color: var(--primary-magenta);"></i>
+          Your Blended Movie DNA Signature
+        </h2>
+        <button id="btn-export-dna" class="btn-secondary" style="font-size: 0.85rem;">
+          <i class="fa-solid fa-download"></i> Export Profile JSON
+        </button>
+      </div>
+
+      <div class="analytics-grid">
+        <!-- Top TF-IDF Keywords -->
+        <div>
+          <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--text-main);">
+            <i class="fa-solid fa-key" style="color: var(--primary-cyan);"></i> Top TF-IDF Plot Keywords
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            Highest mathematically weighted thematic keywords extracted from your favorite movies' plots:
+          </p>
+          <div id="keywords-container" class="keywords-container">
+            <!-- Keywords pills -->
+          </div>
+        </div>
+
+        <!-- Genre Distribution -->
+        <div>
+          <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--text-main);">
+            <i class="fa-solid fa-tags" style="color: var(--primary-violet);"></i> Genre Distribution Profile
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            Proportional genre breakdown calculated from your selections:
+          </p>
+          <div id="genre-bars-container" class="genre-bars">
+            <!-- Genre bar items -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recommendations Grid -->
+    <section class="results-section">
+      <div class="results-header">
+        <div>
+          <h2 class="section-title">
+            <i class="fa-solid fa-film" style="color: var(--primary-cyan);"></i>
+            Top DNA Matches For You
+          </h2>
+          <div id="results-subtitle" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+            Showing top mathematically similar recommendations
+          </div>
+        </div>
+
+        <div class="controls-group">
+          <select id="sort-select" class="select-control">
+            <option value="match">Sort by: DNA Match %</option>
+            <option value="rating">Sort by: Rating (High to Low)</option>
+            <option value="date">Sort by: Release Date</option>
+          </select>
+          <select id="genre-filter-select" class="select-control">
+            <option value="all">All Genres</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Movies Grid -->
+      <div id="recommendations-grid" class="movies-grid">
+        <!-- Rendered movie cards -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Movie Detail Modal -->
+  <div id="movie-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="modal-close-btn" class="modal-close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      
+      <img id="modal-banner" class="modal-banner" src="" alt="Backdrop">
+      
+      <div class="modal-body">
+        <h2 id="modal-title" style="font-size: 2rem; font-weight: 800; margin-bottom: 8px;"></h2>
+        
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+          <span id="modal-match" class="badge-tag live-api" style="font-weight: 800;">95% Match</span>
+          <span id="modal-rating" class="rating-star"><i class="fa-solid fa-star"></i> 8.4</span>
+          <span id="modal-date" style="color: var(--text-muted); font-size: 0.9rem;">2024</span>
+        </div>
+
+        <div id="modal-genres" class="genre-tags" style="margin-bottom: 20px;"></div>
+
+        <p id="modal-overview" style="color: var(--text-main); font-size: 1rem; line-height: 1.7; margin-bottom: 24px;"></p>
+
+        <div style="background: rgba(255, 255, 255, 0.04); padding: 16px; border-radius: 12px; border: 1px solid var(--glass-border);">
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-cyan);">
+            <i class="fa-solid fa-dna"></i> Key Thematic Keywords
+          </h4>
+          <div id="modal-keywords" class="keywords-container"></div>
+        </div>
+
+        <div style="margin-top: 24px; display: flex; gap: 12px;">
+          <button id="modal-add-btn" class="btn-primary" style="flex: 1;">
+            <i class="fa-solid fa-plus"></i> Add to Favorites & Re-blend
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="dataset.js"></script>
+  <script src="tfidf_engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
