@@ -84,31 +84,25 @@ class MovieDNAApp {
 
   async fetchLiveTMDBTrending() {
     try {
-      const res = await fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}&page=1`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data.results || !data.results.length) return;
-
+      // Fetch 5 pages = 100 trending movies
+      const pages = [1, 2, 3, 4, 5];
       const existingIds = new Set(this.moviesCorpus.map(m => m.id));
       let addedNew = false;
 
-      data.results.forEach(m => {
-        if (!existingIds.has(m.id)) {
-          this.moviesCorpus.push({
-            id: m.id,
-            title: m.title || m.original_title,
-            original_title: m.original_title,
-            overview: m.overview || "",
-            poster_path: m.poster_path ? (m.poster_path.startsWith("http") ? m.poster_path : `${TMDB_IMAGE_BASE}${m.poster_path}`) : "https://via.placeholder.com/500x750?text=No+Poster",
-            backdrop_path: m.backdrop_path ? (m.backdrop_path.startsWith("http") ? m.backdrop_path : `${TMDB_BACKDROP_BASE}${m.backdrop_path}`) : "",
-            genre_ids: m.genre_ids || [],
-            vote_average: m.vote_average || 0,
-            vote_count: m.vote_count || 0,
-            release_date: m.release_date || ""
-          });
-          addedNew = true;
-        }
-      });
+      for (const page of pages) {
+        const res = await fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}&page=${page}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (!data.results) continue;
+
+        data.results.forEach(m => {
+          if (!existingIds.has(m.id)) {
+            this.moviesCorpus.push(this.normalizeTMDBMovie(m));
+            existingIds.add(m.id);
+            addedNew = true;
+          }
+        });
+      }
 
       if (addedNew) {
         this.retrainEngine();
@@ -116,7 +110,37 @@ class MovieDNAApp {
         this.runAnalysisAndRecommend();
       }
     } catch (e) {
-      console.log("TMDB live fetch fallback to local corpus:", e);
+      console.log("TMDB trending fetch error:", e);
+    }
+  }
+
+  normalizeTMDBMovie(m) {
+    return {
+      id: m.id,
+      title: m.title || m.original_title,
+      original_title: m.original_title,
+      overview: m.overview || "",
+      poster_path: m.poster_path
+        ? (m.poster_path.startsWith("http") ? m.poster_path : `${TMDB_IMAGE_BASE}${m.poster_path}`)
+        : "https://placehold.co/500x750/111425/666?text=No+Poster",
+      backdrop_path: m.backdrop_path
+        ? (m.backdrop_path.startsWith("http") ? m.backdrop_path : `${TMDB_BACKDROP_BASE}${m.backdrop_path}`)
+        : "",
+      genre_ids: m.genre_ids || [],
+      vote_average: m.vote_average || 0,
+      vote_count: m.vote_count || 0,
+      release_date: m.release_date || ""
+    };
+  }
+
+  async searchTMDB(query) {
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=1`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.results || []).slice(0, 8);
+    } catch (e) {
+      return [];
     }
   }
 
@@ -183,37 +207,87 @@ class MovieDNAApp {
       return;
     }
 
-    const matches = this.moviesCorpus.filter(m => 
-      m.title.toLowerCase().includes(q) || (m.overview && m.overview.toLowerCase().includes(q))
+    // First show local matches instantly
+    const localMatches = this.moviesCorpus.filter(m =>
+      m.title.toLowerCase().includes(q) ||
+      (m.original_title && m.original_title.toLowerCase().includes(q)) ||
+      (m.overview && m.overview.toLowerCase().includes(q))
     ).slice(0, 8);
 
-    if (matches.length === 0) {
-      this.autocompleteDropdown.innerHTML = `<div class="autocomplete-item" style="color: var(--text-muted);">No movies found matching "${query}"</div>`;
+    this.renderAutocomplete(localMatches, query, true);
+    this.autocompleteDropdown.style.display = "block";
+
+    // Then fire TMDB live search and merge results
+    clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(async () => {
+      const tmdbResults = await this.searchTMDB(query);
+      const existingIds = new Set(this.moviesCorpus.map(m => m.id));
+      let addedNew = false;
+
+      tmdbResults.forEach(m => {
+        if (!existingIds.has(m.id)) {
+          this.moviesCorpus.push(this.normalizeTMDBMovie(m));
+          existingIds.add(m.id);
+          addedNew = true;
+        }
+      });
+
+      if (addedNew) this.retrainEngine();
+
+      // Re-render with merged local + TMDB results
+      const mergedMatches = this.moviesCorpus.filter(m =>
+        m.title.toLowerCase().includes(q) ||
+        (m.original_title && m.original_title.toLowerCase().includes(q)) ||
+        (m.overview && m.overview.toLowerCase().includes(q))
+      ).slice(0, 10);
+
+      if (this.searchInput.value.trim().toLowerCase() === q) {
+        this.renderAutocomplete(mergedMatches, query, false);
+      }
+    }, 350);
+  }
+
+  renderAutocomplete(matches, query, isLoading) {
+    if (matches.length === 0 && !isLoading) {
+      this.autocompleteDropdown.innerHTML = `
+        <div class="autocomplete-item" style="color: var(--text-muted); flex-direction: column; align-items: flex-start;">
+          <span>No results found for "${query}"</span>
+          <span style="font-size:0.75rem; margin-top:4px;">Try a different spelling or check TMDB connection.</span>
+        </div>`;
     } else {
-      this.autocompleteDropdown.innerHTML = matches.map(m => `
+      const loadingTag = isLoading
+        ? `<div style="padding: 8px 20px; font-size:0.78rem; color: var(--primary-cyan); border-bottom: 1px solid var(--glass-border);">
+             <i class="fa-solid fa-circle-notch fa-spin"></i> Searching TMDB for more results...
+           </div>`
+        : '';
+
+      this.autocompleteDropdown.innerHTML = loadingTag + matches.map(m => `
         <div class="autocomplete-item" data-id="${m.id}">
-          <img src="${m.poster_path}" class="autocomplete-thumb" alt="${m.title}" onerror="this.src='https://via.placeholder.com/100x150?text=Movie'">
+          <img src="${m.poster_path}" class="autocomplete-thumb" alt="${m.title}"
+            onerror="this.src='https://placehold.co/100x150/111425/666?text=Movie'">
           <div>
             <div class="autocomplete-title">${m.title}</div>
-            <div class="autocomplete-meta">${m.release_date ? m.release_date.split('-')[0] : ''} • ★ ${m.vote_average.toFixed(1)}</div>
+            <div class="autocomplete-meta">
+              ${m.release_date ? m.release_date.split('-')[0] : 'N/A'} &nbsp;•&nbsp;
+              <span style="color: var(--accent-gold);">★</span> ${Number(m.vote_average).toFixed(1)}
+            </div>
           </div>
         </div>
       `).join("");
-
-      // Add click listener
-      const items = this.autocompleteDropdown.querySelectorAll(".autocomplete-item");
-      items.forEach(item => {
-        item.addEventListener("click", () => {
-          const movieId = parseInt(item.getAttribute("data-id"));
-          const movie = this.moviesCorpus.find(m => m.id === movieId);
-          if (movie) {
-            this.addMovieToSelected(movie);
-            this.searchInput.value = "";
-            this.autocompleteDropdown.style.display = "none";
-          }
-        });
-      });
     }
+
+    // Bind click handlers
+    this.autocompleteDropdown.querySelectorAll(".autocomplete-item[data-id]").forEach(item => {
+      item.addEventListener("click", () => {
+        const movieId = parseInt(item.getAttribute("data-id"));
+        const movie = this.moviesCorpus.find(m => m.id === movieId);
+        if (movie) {
+          this.addMovieToSelected(movie);
+          this.searchInput.value = "";
+          this.autocompleteDropdown.style.display = "none";
+        }
+      });
+    });
 
     this.autocompleteDropdown.style.display = "block";
   }
